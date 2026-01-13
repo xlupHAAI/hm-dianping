@@ -10,9 +10,9 @@ import com.hmdp.service.IBlogService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
+import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
 import java.util.List;
 
 /**
@@ -35,7 +35,7 @@ public class BlogController {
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
         // 获取登录用户
-        UserDTO user = UserHolder.getUser();
+        UserDTO user = UserHolder.get();
         blog.setUserId(user.getId());
         // 保存探店博文
         blogService.save(blog);
@@ -54,7 +54,7 @@ public class BlogController {
     @GetMapping("/of/me")
     public Result queryMyBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
         // 获取登录用户
-        UserDTO user = UserHolder.getUser();
+        UserDTO user = UserHolder.get();
         // 根据用户查询
         Page<Blog> page = blogService.query()
                 .eq("user_id", user.getId()).page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
