@@ -7,12 +7,17 @@ public class RedisConstants {
     public static final String LOGIN_TOKEN_PREFIX = "login:token:";
     public static final Long LOGIN_TOKEN_TTL = 300L;
 
+    public static final String CACHE_SHOP_PREFIX = "cache:shop:";
+    public static final Long CACHE_SHOP_TTL = 30L;
+
     public static final Long CACHE_NULL_TTL = 2L;
 
-    public static final Long CACHE_SHOP_TTL = 30L;
-    public static final String CACHE_SHOP_KEY = "cache:shop:";
+    public static final Long LOGICAL_EXPIRE_LEASE = 30L;    // 'seconds
 
-    public static final String LOCK_SHOP_KEY = "lock:shop:";
+    public static final String CACHE_SHOPTYPE_KEY = "cache:shoptypes";
+    public static final Long CACHE_SHOPTYPE_TTL = 60L;
+
+    public static final String LOCK_SHOP_PREFIX = "lock:shop:";
     public static final Long LOCK_SHOP_TTL = 10L;
 
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
