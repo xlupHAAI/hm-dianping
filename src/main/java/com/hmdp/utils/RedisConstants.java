@@ -10,7 +10,9 @@ public class RedisConstants {
     public static final String CACHE_SHOP_PREFIX = "cache:shop:";
     public static final Long CACHE_SHOP_TTL = 30L;
 
-    public static final Long CACHE_NULL_TTL = 2L;
+    public static final Long HOTSHOP_CMTS_BASELINE = 2500L;
+
+    public static final Long CACHE_NULL_TTL = 5L;
 
     public static final Long LOGICAL_EXPIRE_LEASE = 30L;    // 'seconds
 

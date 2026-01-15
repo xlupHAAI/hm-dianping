@@ -19,7 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -45,8 +47,30 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     private static final ExecutorService Executor4HotshopEnsurance = Executors.newFixedThreadPool(5);
 
+    private final Set<Long> hotShops = new HashSet<>();
+
+    @PostConstruct
+    public void init() {
+        log.debug("ShopServiceImpl初始化完成，加载热点商户到redis中。");
+        new Thread(() -> {
+            try {
+                Thread.sleep(500); // 确保Redis连接等基础设施就绪
+                preheatHotShops();
+            } catch (Exception e) {
+                log.error("商户缓存预热失败", e);
+            }
+        }, "CachePreheatThread").start();
+    }
+
+    private void preheatHotShops() {
+        for (Shop shop : query().ge("comments", HOTSHOP_CMTS_BASELINE).list()) {
+            hotShops.add(shop.getId());
+            saveShop2Redis(shop, -1L);
+        }
+    }
+
     private boolean shopIsHot(Long id) {
-        return true;   // 判断是否是热点数据。^^^未实现
+        return hotShops.contains(id);
     }
 
     @Override
@@ -55,7 +79,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         Shop shop = shopIsHot(id)
                 ? queryWithLogicalExpire(id)
                 : queryWithPassThrough(id);
-
+        
         return shop == null ? Result.fail("不存在的店铺信息!") : Result.ok(shop);
     }
 
@@ -84,7 +108,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
             Executor4HotshopEnsurance.submit(() -> {    // 异步地更新逻辑过期时间，直接返回旧数据
                 try {
-                    saveShop2Redis(id, LOGICAL_EXPIRE_LEASE);
+                    saveShop2Redis(shop, LOGICAL_EXPIRE_LEASE);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 } finally {
@@ -122,7 +146,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // ^^^先更新数据库，后删缓存，原子性由事务保证
         updateById(shop);
         if (shopIsHot(shop.getId())) {
-            saveShop2Redis(shop.getId(), -1L);  // hotshop要一直保存在redis中，设置为逻辑已过期
+            saveShop2Redis(shop, -1L);  // hotshop要一直保存在redis中，设置为逻辑已过期
         } else stringRedisTemplate.delete(CACHE_SHOP_PREFIX + shop.getId());
         return Result.ok();
     }
@@ -134,10 +158,14 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     public void saveShop2Redis(Long id, Long expireSeconds) {
         Shop shop = getById(id);
+        saveShop2Redis(shop, expireSeconds);
+    }
+
+    public void saveShop2Redis(Shop shop, Long expireSeconds) {
         RedisData redisData = new RedisData();
         redisData.setData(shop);
         redisData.setExpireTime(LocalDateTime.now().plusSeconds(expireSeconds));
-        stringRedisTemplate.opsForValue().set(CACHE_SHOP_PREFIX + id, JSONUtil.toJsonStr(redisData));
+        stringRedisTemplate.opsForValue().set(CACHE_SHOP_PREFIX + shop.getId(), JSONUtil.toJsonStr(redisData));
     }
 
     private boolean tryLock(String key) {
