@@ -141,8 +141,8 @@ return proxy.createVoucherOrder(voucherId);   // 创建新订单
 
 使用 `select for update`保证线程安全，同一用户下单 1000 次并发测试：
 
-![](assets\imgs\descri_1OrderLimit_03.png)
+<img src="assets\imgs\descri_1OrderLimit_03.png"  />
 
 使用 `synchronized`，但这种方法不能保证集群服务下的线程安全，性能稍好些：
 
-![](assets\imgs\descri_1OrderLimit_04.png)
+<img src="assets\imgs\descri_1OrderLimit_04.png"  />
