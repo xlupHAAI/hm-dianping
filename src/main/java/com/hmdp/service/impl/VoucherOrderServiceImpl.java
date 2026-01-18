@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
@@ -10,6 +11,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -38,8 +40,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private ISeckillVoucherService seckillVoucherService;
 
+
     @Override
-    @Transactional
     public Result seckillVouchers(Long voucherId) {
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
         LocalDateTime currentTime = LocalDateTime.now();
@@ -49,20 +51,83 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("不在秒杀活动时间内!");
         }
 
-        if (voucher.getStock() < 1 ||       // 库存不足或扣减失败
-                !seckillVoucherService.update().setSql("stock = stock - 1")
-                        .eq("voucher_id", voucherId).gt("stock",0).update())    // 乐观锁
+        if (voucher.getStock() < 1)
             return Result.fail("库存不足！");
 
-        /**
-         * 创建新订单
-         */
+        IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+        return proxy.createVoucherOrder(voucherId);   // 创建新订单
+    }
+
+    @Transactional
+    public Result createVoucherOrder(Long voucherId) {
+        Long userId = UserHolder.get().getId();
+
+        QueryWrapper queryWrapper = new QueryWrapper();
+        {
+            queryWrapper.eq("user_id", userId);
+            queryWrapper.eq("voucher_id", voucherId);
+            queryWrapper.last("for update");
+        }
+
+        if (baseMapper.selectCount(queryWrapper) > 0) {
+            return Result.fail("当前用户已经购买过！");
+        }
+
+        if (!seckillVoucherService.update().setSql("stock = stock - 1")
+                .eq("voucher_id", voucherId).gt("stock", 0).update())
+            return Result.fail("下单失败！");
+
         VoucherOrder voucherOrder = new VoucherOrder();
         voucherOrder.setId(redisIdWorker.nextId("order"));
-        voucherOrder.setUserId(UserHolder.get().getId());
+        voucherOrder.setUserId(userId);
         voucherOrder.setVoucherId(voucherId);
 
         save(voucherOrder);
         return Result.ok(voucherOrder.getId());
     }
+
+
+    /*  使用 synchronized，不能应对服务器集群。
+
+    @Override
+    public Result seckillVouchers(Long voucherId) {
+        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+        LocalDateTime currentTime = LocalDateTime.now();
+
+        if (voucher.getBeginTime().isAfter(currentTime)
+                || voucher.getEndTime().isBefore(currentTime)) {
+            return Result.fail("不在秒杀活动时间内!");
+        }
+
+        if (voucher.getStock() < 1)
+            return Result.fail("库存不足！");
+
+        synchronized (UserHolder.get().getId().toString().intern()) {
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);   // 创建新订单
+        }
+    }
+
+    @Transactional
+    public Result createVoucherOrder(Long voucherId) {
+        Long userId = UserHolder.get().getId();
+
+        long count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+        if (count > 0) {
+            return Result.fail("当前用户已经购买过！");
+        }
+
+        if (!seckillVoucherService.update().setSql("stock = stock - 1")
+                .eq("voucher_id", voucherId).gt("stock", 0).update())
+            return Result.fail("下单失败！");
+
+        VoucherOrder voucherOrder = new VoucherOrder();
+        voucherOrder.setId(redisIdWorker.nextId("order"));
+        voucherOrder.setUserId(userId);
+        voucherOrder.setVoucherId(voucherId);
+
+        save(voucherOrder);
+        return Result.ok(voucherOrder.getId());
+    }
+*/
 }
