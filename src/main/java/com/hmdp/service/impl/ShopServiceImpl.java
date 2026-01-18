@@ -126,7 +126,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Shop shop = getById(id);
             stringRedisTemplate.opsForValue().set(
                     shopKey,
-                    shop == null ? "" : JSONUtil.toJsonStr(shop),   // ^^^防缓存穿透
+                    shop == null ? "" : JSONUtil.toJsonStr(shop),   // 防缓存穿透
                     shop == null ? CACHE_NULL_TTL : CACHE_SHOP_TTL,
                     TimeUnit.MINUTES
             );
@@ -143,7 +143,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if (shop.getId() == null) {
             return Result.fail("店铺ID为空!");
         }
-        // ^^^先更新数据库，后删缓存，原子性由事务保证
+        // 先更新数据库，后删缓存，原子性由事务保证
         updateById(shop);
         if (shopIsHot(shop.getId())) {
             saveShop2Redis(shop, -1L);  // hotshop要一直保存在redis中，设置为逻辑已过期

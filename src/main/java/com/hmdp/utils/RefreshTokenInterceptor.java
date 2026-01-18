@@ -18,7 +18,7 @@ import static com.hmdp.utils.RedisConstants.LOGIN_TOKEN_TTL;
 @Slf4j
 public class RefreshTokenInterceptor implements HandlerInterceptor {
 
-    private StringRedisTemplate stringRedisTemplate;    // ^^^ 这个地方因为RefreshTokenInterceptor是手动new出来的，不是由Spring创建，因此不能直接依赖注入
+    private StringRedisTemplate stringRedisTemplate;    // 这个地方因为RefreshTokenInterceptor是手动new出来的，不是由Spring创建，因此不能直接依赖注入
 
     public RefreshTokenInterceptor(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
