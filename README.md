@@ -80,9 +80,9 @@ public Result createVoucherOrder(...) {
 }
 ```
 
-<img src="D:\develop_project\JProjects\hm-dianping\assets\imgs\descri_1OrderLimit_01.png"  />
+<img src="assets\imgs\descri_1OrderLimit_01.png"  />
 
-<img src="D:\develop_project\JProjects\hm-dianping\assets\imgs\descri_1OrderLimit_02.png" alt="descri_1OrderLimit_02"  />
+<img src="assets\imgs\descri_1OrderLimit_02.png" alt="descri_1OrderLimit_02"  />
 
 原因：**`synchronized`锁粒度与 Spring 事务粒度不匹配。**`createVoucherOrder()`内部使用 `synchronized`，在事务结束前就将其释放，等于事务还未提交其它事务就可能获得这把锁；而`createVoucherOrder()`方法的逻辑是先进行一人一单判断，再创建订单，即先快照读再当前读，那么就有可能：
 
@@ -141,8 +141,8 @@ return proxy.createVoucherOrder(voucherId);   // 创建新订单
 
 使用 `select for update`保证线程安全，同一用户下单 1000 次并发测试：
 
-![](D:\develop_project\JProjects\hm-dianping\assets\imgs\descri_1OrderLimit_03.png)
+![](assets\imgs\descri_1OrderLimit_03.png)
 
 使用 `synchronized`，但这种方法不能保证集群服务下的线程安全，性能稍好些：
 
-![descri_1OrderLimit_04](D:\develop_project\JProjects\hm-dianping\assets\imgs\descri_1OrderLimit_04.png)
+![descri_1OrderLimit_04](assets\imgs\descri_1OrderLimit_04.png)
