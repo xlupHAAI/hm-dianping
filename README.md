@@ -145,4 +145,4 @@ return proxy.createVoucherOrder(voucherId);   // 创建新订单
 
 使用 `synchronized`，但这种方法不能保证集群服务下的线程安全，性能稍好些：
 
-![descri_1OrderLimit_04](assets\imgs\descri_1OrderLimit_04.png)
+![](assets\imgs\descri_1OrderLimit_04.png)
