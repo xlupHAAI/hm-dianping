@@ -61,7 +61,19 @@
 
 - 利用 Redission 在 Redis 中加分布式锁，针对同一用户重复下单的场景（利用 1000 个线程并发测试），吞吐率提升了 73%，响应时间标准差提升了 39%。
 
-![](assets\imgs\test_1OrderLimitByRedission.png)
+<img src="assets\imgs\test_1OrderLimitByRedission.png"  />
+
+2026.01.22	ver1.3.5 使用缓存和异步流程优化秒杀业务
+
+1. 将优惠卷库存信息和订单信息添加到缓存，在 Redis 中利用 lua 脚本完成库存判断和一人一单校验，减少 DB 访问次数；
+2. 使用 Write Behind Caching 方式同步缓存和 DB，库存扣减和下单操作先在缓存中进行，再由一线程单独将缓存数据持久化到 DB，保证最终一致。目前使用 JDK 阻塞队列实现，后续更换成 Kafka。（⚪）
+3. 原先的秒杀业务处理流程，在成功下单并响应用户请求之前需要执行 4 次 SQL：
+
+<img src="assets\imgs\process_SeckillVoucherOrder.png" style="zoom: 67%;" />
+
+4. 优化后异步的秒杀处理流程，在响应客户端之前不需要访问 DB，大大提高了响应速度；
+
+<img src="assets\imgs\process_SeckillVoucherOrderAsync.png" alt="process_SeckillVoucherOrderAsync" style="zoom:80%;" />
 
 
 
