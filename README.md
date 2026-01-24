@@ -69,11 +69,33 @@
 2. 使用 Write Behind Caching 方式同步缓存和 DB，库存扣减和下单操作先在缓存中进行，再由一线程单独将缓存数据持久化到 DB，保证最终一致。目前使用 JDK 阻塞队列实现，后续更换成 Kafka。（⚪）
 3. 原先的秒杀业务处理流程，在成功下单并响应用户请求之前需要执行 4 次 SQL：
 
-<img src="assets\imgs\process_SeckillVoucherOrder.png" style="zoom: 67%;" />
+<img src="assets\imgs\process_SeckillVoucherOrder.png" style="zoom: 50%;" />
 
 4. 优化后异步的秒杀处理流程，在响应客户端之前不需要访问 DB，大大提高了响应速度；
 
 <img src="assets\imgs\process_SeckillVoucherOrderAsync.png" alt="process_SeckillVoucherOrderAsync" style="zoom:80%;" />
+
+2026.01.24	ver1.3.6 完成秒杀模块的基本功能
+
+1. 修复了异步线程无法成功获取业务层代理对象导致无法成功下单的bug；
+2. 使用 Cache Aside 策略和 Write Behind Caching 策略的性能对比：模拟 500 个用户，将 UserDTO 和 token 预热到缓存，同时将 tokens 保存在文本文件中，利用 JMeter 模拟 500 个线程，从文件中读取 token 以模拟 500 个用户同时点击秒杀请求；
+
+
+
+<img src="assets\imgs\test_500UsrsSimu.png" style="zoom:80%;" />
+
+验证正确性：全部库存售出（500单），无超卖且符合一人一单；
+
+<img src="assets\imgs\test_SeckillVoucherOrders_500usrs.png" alt="test_SeckillVoucherOrders_500usrs" style="zoom:60%;" />
+
+性能测试：
+
+- 优化前，使用 Cache Aside 策略，双写结束后响应客户端，QPS 146.3，平均响应时间 1656ms；
+- 使用 Write Behind Caching 思想异步优化秒杀流程后，QPS 1639.3，提升 11 倍，平均响应时间 135ms，减少了 92%。
+
+<img src="assets\imgs\test_SeckillByCacheAside_500usrs.png" alt="test_SeckillByCacheAside_500usrs" style="zoom:100%;" />
+
+<img src="assets\imgs\test_SeckillByWriteBehindCaching_500usrs.png" alt="test_SeckillByWriteBehindCaching_500usrs" style="zoom:100%;" />
 
 
 
@@ -168,3 +190,14 @@ return proxy.createVoucherOrder(voucherId);   // 创建新订单
 使用 `synchronized`，但这种方法不能保证集群服务下的线程安全，性能稍好些：
 
 <img src="assets\imgs\descri_1OrderLimit_04.png"  />
+
+##### 2026.01.24
+
+使用 Write Behind Caching 策略异步优化秒杀业务，开启一个线程在业务线程响应抢单结果后异步地向 DB 扣减库存和创建订单。用事务保证后者的原子性，避免自调用使事务失效通过 `SeckillVoucherOrderImpl` 的代理类调用方法，报错：
+
+```java
+java.lang.IllegalStateException: Cannot find current proxy: Set 'exposeProxy' property on Advised to 'true' to make it available, and ensure that AopContext.currentProxy() is invoked in the same thread as the AOP invocation context.
+	at org.springframework.aop.framework.AopContext.currentProxy(AopContext.java:69) ~[spring-aop-6.1.13.jar:6.1.13]
+```
+
+原因：通过 `AopContext.currentProxy()`获取代理类，但其本质是将代理类保存在 `ThreadLocal`中，子线程自身的 `ThreadLocalMap`中没有保存代理类的上下文。debug：父线程把下单任务提交到阻塞队列之前获取 proxy 对象存在成员变量中，供子线程直接获取。

@@ -83,9 +83,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     private void handleVoucherOrder(VoucherOrder voucherOrder) {
-        IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+        //IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
         proxy.createVoucherOrder(voucherOrder);   // 创建新订单
     }
+
 
     @Transactional
     public void createVoucherOrder(VoucherOrder voucherOrder) {
@@ -104,7 +105,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                 return;
             }
             if (!seckillVoucherService.update().setSql("stock = stock - 1")
-                    .eq("voucher_id", voucherId).gt("stock", 0).update()){
+                    .eq("voucher_id", voucherId).gt("stock", 0).update()) {
                 log.error("下单失败！");
                 return;
             }
@@ -113,6 +114,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             redisLock.unlock();
         }
     }
+
+    private IVoucherOrderService proxy;
 
     @Override
     public Result seckillVouchers(Long voucherId) {
@@ -137,8 +140,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         orderTasks.add(voucherOrder);
 
+        proxy = (IVoucherOrderService) AopContext.currentProxy();  // 提前获取代理对象，上下文保存在父线程的ThreadLocalMap中
+
         return Result.ok(orderId);
     }
+
+
 
     @Transactional
     public Result createVoucherOrder(Long voucherId) {
@@ -220,9 +227,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         save(voucherOrder);
         return Result.ok(voucherOrder.getId());
-    }
+    } */
 
-    */
 
 //  使用 MySQL 加锁
 //    @Override
